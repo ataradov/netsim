@@ -1,0 +1,96 @@
+00000iiiiiaaaddd	- LSLS	Rd, Ra, #imm5
+00001iiiiiaaaddd	- LSRS	Rd, Ra, #imm5
+00010iiiiiaaaddd	- ASRS	Rd, Ra, #imm5
+0001100bbbaaaddd	- ADDS	Rd, Ra, Rb
+0001101bbbaaaddd	- SUBS	Rd, Ra, Rb
+0001110iiiaaaddd	- ADDS  Rd, Ra, #imm3
+0001111iiiaaaddd	- SUBS  Rd, Ra, #imm3
+00100dddiiiiiiii	- MOVS	Rd, #imm8
+00101aaaiiiiiiii	- CMP	Ra, #imm8
+00110dddiiiiiiii	- ADDS	Rda, #imm8
+00111dddiiiiiiii	- SUBS	Rda, #imm8
+
+0100000000bbbddd	- ANDS	Rda, Rb
+0100000001bbbddd	- EORS	Rda, Rb
+0100000010bbbddd	- LSLS	Rda, Rb
+0100000011bbbddd	- LSRS	Rda, Rb
+0100000100bbbddd	- ASRS	Rda, Rb
+0100000101bbbddd	- ADCS	Rda, Rb
+0100000110bbbddd	- SBCS	Rda, Rb
+0100000111bbbddd	- RORS	Rda, Rb
+0100001000bbbaaa	- TST	Ra, Rb
+0100001001bbbddd	- RSBS	Rd, Rb, #0
+0100001010bbbaaa	- CMP	Ra, Rb
+0100001011bbbaaa	- CMN	Ra, Rb
+0100001100bbbddd	- ORRS	Rda, Rb
+0100001101aaaddd	- MULS	Rdb, Ra, Rdb
+0100001110bbbddd	- BICS	Rda, Rb
+0100001111bbbddd	- MVNS	Rd, Rb
+
+01000100dbbbbddd	- ADD	Rda, Rb
+01000101abbbbaaa	- CMP	Ra, Rb
+01000110dbbbbddd	- MOV	Rd, Rb
+010001110bbbb000	- BX	Rb
+010001111bbbb000	- BLX	Rb
+
+01001dddiiiiiiii	- LDR	Rd, [PC, #imm8]
+
+0101000bbbaaaddd	- STR	Rd, [Ra, Rb]
+0101001bbbaaaddd	- STRH	Rd, [Ra, Rb]
+0101010bbbaaaddd	- STRB	Rd, [Ra, Rb]
+0101011bbbaaaddd	- LDRSB	Rd, [Ra, Rb]
+0101100bbbaaaddd	- LDR	Rd, [Ra, Rb]
+0101101bbbaaaddd	- LDRH	Rd, [Ra, Rb]
+0101110bbbaaaddd	- LDRB	Rd, [Ra, Rb]
+0101111bbbaaaddd	- LDRSH	Rd, [Ra, Rb]
+01100iiiiiaaaddd	- STR	Rd, [Ra, #imm5]
+01101iiiiiaaaddd	- LDR	Rd, [Ra, #imm5]
+01110iiiiiaaaddd	- STRB	Rd, [Ra, #imm5]
+01111iiiiiaaaddd	- LDRB	Rd, [Ra, #imm5]
+10000iiiiiaaaddd	- STRH	Rd, [Ra, #imm5]
+10001iiiiiaaaddd	- LDRH	Rd, [Ra, #imm5]
+10010dddiiiiiiii	- STR	Rd, [SP, #imm8]
+10011dddiiiiiiii	- LDR	Rd, [SP, #imm8]
+
+10100dddiiiiiiii	- ADD	Rd, PC, #imm8
+10101dddiiiiiiii	- ADD	Rd, SP, #imm8
+
+101100000iiiiiii	- ADD	SP, SP, #imm7
+101100001iiiiiii	- SUB	SP, SP, #imm7
+1011001000aaaddd	- SXTH	Rd, Ra
+1011001001aaaddd	- SXTB	Rd, Ra
+1011001010aaaddd	- UXTH	Rd, Ra
+1011001011aaaddd	- UXTB	Rd, Ra
+1011010mrrrrrrrr	- PUSH	{registers}
+1011110prrrrrrrr	- POP	{registers}
+10110110011i0010	- CPS<effect>	i
+1011101000aaaddd	- REV	Rd, Ra
+1011101001aaaddd	- REV16	Rd, Ra
+1011101011aaaddd	- REVSH	Rd, Ra
+10111110iiiiiiii	- BKPT	#imm8
+1011111100000000	- NOP
+1011111100010000	- YIELD
+1011111100100000	- WFE
+1011111100110000	- WFI
+1011111101000000	- SEV
+
+11000aaarrrrrrrr	- STM	Ra!, {registers}
+11001aaarrrrrrrr	- LDM	Ra{!}, {registers}
+
+1101cccciiiiiiii	- B<c>	#imm8
+11011110iiiiiiii	- UDF	#imm8
+11011111iiiiiiii	- SVC	#imm8
+
+11100iiiiiiiiiii	- B<c>	#imm11
+
+1111001111101111 1000ddddssssssss	- MRS	Rd, spec_reg
+111100111000aaaa 10001000ssssssss	- MSR	spec_reg, Ra
+111101111111iiii 1010iiiiiiiiiiii	- UDF.W	#imm16
+
+1111001110111111 100011110100iiii	- DSB	#imm4
+1111001110111111 100011110101iiii	- DMB	#imm4
+1111001110111111 100011110110iiii	- ISB	#imm4
+
+11110siiiiiiiiii 11j1jiiiiiiiiiii	- BL	#imm
+
+

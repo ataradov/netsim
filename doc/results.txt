@@ -1,0 +1,60 @@
+------ original ------
+4x4:
+	200000000 cycles in 82143 ms => 2434778 cycles/sec
+10x10:
+	20000000 cycles in 62318 ms => 320934 cycles/sec
+
+------ timer change ------
+4x4:
+	200000000 cycles in 70155 ms => 2850830 cycles/sec
+10x10:
+	20000000 cycles in 57321 ms => 348912 cycles/sec
+
+4x4 win:
+	200000000 cycles in 103126 ms => 1939375 cycles/sec
+
+------ core change ------
+4x4:
+	200000000 cycles in 59709 ms => 3349578 cycles/sec
+10x10:
+	20000000 cycles in 47584 ms => 420309 cycles/sec
+
+
+-------------------------
+0000000000000c30 <i_lsls_imm_0x0027>:
+     c30:	0f b7 47 4c          	movzwl 0x4c(%rdi),%eax
+     c34:	89 c2                	mov    %eax,%edx
+     c36:	89 c1                	mov    %eax,%ecx
+     c38:	66 c1 e8 03          	shr    $0x3,%ax
+     c3c:	83 e0 07             	and    $0x7,%eax
+     c3f:	66 c1 e9 06          	shr    $0x6,%cx
+     c43:	83 e2 07             	and    $0x7,%edx
+     c46:	8b 44 87 08          	mov    0x8(%rdi,%rax,4),%eax
+     c4a:	83 e1 1f             	and    $0x1f,%ecx
+     c4d:	89 c6                	mov    %eax,%esi
+     c4f:	74 17                	je     c68 <i_lsls_imm_0x0027+0x38>
+     c51:	41 b8 20 00 00 00    	mov    $0x20,%r8d
+     c57:	d3 e0                	shl    %cl,%eax
+     c59:	41 29 c8             	sub    %ecx,%r8d
+     c5c:	44 89 c1             	mov    %r8d,%ecx
+     c5f:	d3 ee                	shr    %cl,%esi
+     c61:	83 e6 01             	and    $0x1,%esi
+     c64:	40 88 77 4a          	mov    %sil,0x4a(%rdi)
+     c68:	85 c0                	test   %eax,%eax
+     c6a:	48 63 d2             	movslq %edx,%rdx
+     c6d:	0f 98 47 48          	sets   0x48(%rdi)
+     c71:	85 c0                	test   %eax,%eax
+     c73:	89 44 97 08          	mov    %eax,0x8(%rdi,%rdx,4)
+     c77:	0f 94 47 49          	sete   0x49(%rdi)
+     c7b:	c3                   	retq   
+
+0000000000000490 <i_lsls_imm_0x0027>:
+     490:	8b 47 18             	mov    0x18(%rdi),%eax
+     493:	85 c0                	test   %eax,%eax
+     495:	89 47 24             	mov    %eax,0x24(%rdi)
+     498:	0f 98 47 48          	sets   0x48(%rdi)
+     49c:	85 c0                	test   %eax,%eax
+     49e:	0f 94 47 49          	sete   0x49(%rdi)
+     4a2:	c3                   	retq   
+
+
