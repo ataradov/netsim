@@ -31,16 +31,16 @@
 /*- Types -------------------------------------------------------------------*/
 typedef struct
 {
-  long         seed;
-  long long    time;
+  uint32_t     seed;
+  uint32_t     time;
   float        scale;
 
-  long         uid;
+  uint32_t     uid;
   soc_t        *socs;
   trx_t        *trxs;
   noise_t      *noises;
   sniffer_t    *sniffers;
-  long long    cycle;
+  uint64_t     cycle;
 } sim_t;
 
 /*- Variables ---------------------------------------------------------------*/

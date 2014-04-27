@@ -19,9 +19,10 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <unistd.h>
+#include <inttypes.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/stat.h>
@@ -58,8 +59,8 @@ static void measure_time(void)
     diff_msec = (tv_stop.tv_sec - tv_start.tv_sec)*1000;
     diff_msec += (tv_stop.tv_usec - tv_start.tv_usec)/1000;
 
-    printf("%lld cycles in %u ms => %lld cycles/sec\n", g_sim.cycle, diff_msec,
-        (g_sim.cycle*1000)/diff_msec);
+    printf("%"PRId64" cycles in %u ms => %"PRId64" cycles/sec\n", g_sim.cycle,
+        diff_msec, (g_sim.cycle*1000)/diff_msec);
   }
 }
 

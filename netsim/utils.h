@@ -21,6 +21,7 @@
 /*- Includes ----------------------------------------------------------------*/
 #include <stdio.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include "main.h"
 
 /*- Definitions -------------------------------------------------------------*/
@@ -38,7 +39,7 @@
 
 #define DEBUG(_name, _mod, _fmt, ...) \
   if (DEBUG_##_name) { \
-    printf("%9lld %-6s %-8s " _fmt "\r\n", g_sim.cycle, #_name, \
+    printf("%9"PRId64" %-6s %-8s " _fmt "\r\n", g_sim.cycle, #_name, \
         (_mod)->name, ##__VA_ARGS__); \
   }
 
