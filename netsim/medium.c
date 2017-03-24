@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+ * Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,7 +26,9 @@
 #include "utils.h"
 
 /*- Definitions -------------------------------------------------------------*/
-#define C      299792458.0f  // m/s
+#define C               299792458.0f  // m/s
+#define NOISE_FLOOR     (-120.0) // dBm
+#define ADD_PATH_LOSS   6.0 // dB
 
 /*- Implementations ---------------------------------------------------------*/
 
@@ -64,29 +66,33 @@ void medium_update_trx(trx_t *rx_trx)
 {
   float noise, power, lambda, dist, loss, freq;
   float lqi_carrier, lqi_noise, lqi_power;
-  float carriers[3];
+  float carriers[3], dists[3];
   trx_t *trxs[3];
 
-  noise = MEDIUM_NOISE_FLOOR;
+  noise = NOISE_FLOOR;
   freq = rx_trx->reg.channel * MHz;
   lambda = C / freq;
 
   for (int i = 0; i < 3; i++)
   {
     trxs[i] = NULL;
-    carriers[i] = MEDIUM_NOISE_FLOOR;
+    carriers[i] = NOISE_FLOOR;
+    dists[i] = 10000;
   }
 
-  for (trx_t *tx_trx = g_sim.trxs; tx_trx; tx_trx = tx_trx->next)
+  queue_foreach(trx_t, tx_trx, &g_sim.trxs)
   {
     if (tx_trx == rx_trx || !tx_trx->tx || tx_trx->reg.channel != rx_trx->reg.channel)
       continue;
 
     dist = distance(rx_trx->x, rx_trx->y, tx_trx->x, tx_trx->y);
     loss = 20.0*log10f(4.0*M_PI * dist / lambda);
-    power = tx_trx->reg.tx_power - loss;
+    power = tx_trx->reg.tx_power - loss - ADD_PATH_LOSS;
 
-    if (power < MEDIUM_NOISE_FLOOR)
+    // Simulates random power loss due to fading and multipath propagation (-10 - 0 dB)
+    power += -10.0 * randf_next();
+
+    if (power < rx_trx->reg.rx_sensitivity)
       continue;
 
     if (power > carriers[0])
@@ -94,6 +100,10 @@ void medium_update_trx(trx_t *rx_trx)
       trxs[2] = trxs[1];
       trxs[1] = trxs[0];
       trxs[0] = tx_trx;
+
+      dists[2] = dists[1];
+      dists[1] = dists[0];
+      dists[0] = dist;
 
       carriers[2] = carriers[1];
       carriers[1] = carriers[0];
@@ -104,19 +114,23 @@ void medium_update_trx(trx_t *rx_trx)
       trxs[2] = trxs[1];
       trxs[1] = tx_trx;
 
+      dists[2] = dists[1];
+      dists[1] = dist;
+
       carriers[2] = carriers[1];
       carriers[1] = power;
     }
     else if (power > carriers[2])
     {
       trxs[2] = tx_trx;
+      dists[2] = dist;
       carriers[2] = power;
     }
 
     noise = padd(noise, power);
   }
 
-  for (noise_t *tx_noise = g_sim.noises; tx_noise; tx_noise = tx_noise->next)
+  queue_foreach(noise_t, tx_noise, &g_sim.noises)
   {
     if (!tx_noise->active || freq < tx_noise->freq_a || freq > tx_noise->freq_b)
       continue;
@@ -129,6 +143,7 @@ void medium_update_trx(trx_t *rx_trx)
 
   rx_trx->rx_rssi = noise;
   rx_trx->rx_carrier = carriers[0];
+  rx_trx->rx_dist = dists[0];
 
   if (rx_trx->rx_trx != trxs[0])
     rx_trx->rx_crc_ok = false;
@@ -153,7 +168,7 @@ void medium_update_trx(trx_t *rx_trx)
   lqi_noise = lqi_limit(lqi_noise);
 
   // LQI drop due to RX power level
-  lqi_power = 1.0 - expf(-0.2*(carriers[0] - MEDIUM_NOISE_FLOOR));
+  lqi_power = 1.0 - expf(-0.2*(carriers[0] - NOISE_FLOOR));
   lqi_power = lqi_limit(lqi_power);
 
   rx_trx->rx_lqi *= lqi_carrier * lqi_noise * lqi_power;
@@ -162,7 +177,7 @@ void medium_update_trx(trx_t *rx_trx)
 //-----------------------------------------------------------------------------
 void medium_tx_start(trx_t *trx)
 {
-  for (trx_t *rx_trx = g_sim.trxs; rx_trx; rx_trx = rx_trx->next)
+  queue_foreach(trx_t, rx_trx, &g_sim.trxs)
   {
     if (rx_trx->rx)
       medium_update_trx(rx_trx);
@@ -175,7 +190,7 @@ void medium_tx_start(trx_t *trx)
 //-----------------------------------------------------------------------------
 void medium_tx_end(trx_t *trx, bool normal)
 {
-  for (trx_t *rx_trx = g_sim.trxs; rx_trx; rx_trx = rx_trx->next)
+  queue_foreach(trx_t, rx_trx, &g_sim.trxs)
   {
     if (rx_trx->rx && rx_trx->rx_trx == trx && rx_trx->rx_trx_lock)
       trx_rx_end(rx_trx, normal);
@@ -188,7 +203,7 @@ void medium_tx_end(trx_t *trx, bool normal)
     freq = trx->reg.channel * MHz;
     lambda = C / freq;
 
-    for (sniffer_t *sniffer = g_sim.sniffers; sniffer; sniffer = sniffer->next)
+    queue_foreach(sniffer_t, sniffer, &g_sim.sniffers)
     {
       if (freq < sniffer->freq_a || freq > sniffer->freq_b)
         continue;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+ * Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -37,9 +37,17 @@
 #define SYS_CTRL_UID           MMIO_REG(0x01000000, uint32_t)
 #define SYS_CTRL_ID            MMIO_REG(0x01000004, uint32_t)
 #define SYS_CTRL_RAND          MMIO_REG(0x01000008, uint32_t)
+#define SYS_CTRL_LOG           MMIO_REG(0x0100000c, char *)
 
-#define SYS_TICK_PERIOD        MMIO_REG(0x02000000, uint32_t)
-#define SYS_TICK_COUNTER       MMIO_REG(0x02000004, uint32_t)
+#define SYS_TIMER_CONTROL      MMIO_REG(0x02000000, uint32_t)
+#define SYS_TIMER_PERIOD       MMIO_REG(0x02000004, uint32_t)
+#define SYS_TIMER_COUNTER      MMIO_REG(0x02000008, uint32_t)
+#define SYS_TIMER_INTENCLR     MMIO_REG(0x0200000c, uint32_t)
+#define SYS_TIMER_INTENSET     MMIO_REG(0x02000010, uint32_t)
+#define SYS_TIMER_INTMASK      MMIO_REG(0x02000014, uint32_t)
+#define SYS_TIMER_INTFLAG      MMIO_REG(0x02000018, uint32_t)
+
+#define SYS_TIMER_INTFLAG_COUNT    (1 << 0)
 
 #define TRX_CONFIG             MMIO_REG(0x40000000, uint32_t)
 #define TRX_PAN_ID             MMIO_REG(0x40000004, uint32_t)
@@ -47,24 +55,24 @@
 #define TRX_IEEE_ADDR_0        MMIO_REG(0x4000000c, uint32_t)
 #define TRX_IEEE_ADDR_1        MMIO_REG(0x40000010, uint32_t)
 #define TRX_TX_POWER           MMIO_REG(0x40000014, float)
-#define TRX_CHANNEL            MMIO_REG(0x40000018, uint32_t)
-#define TRX_SFD_VALUE          MMIO_REG(0x4000001c, uint32_t)
-#define TRX_STATE              MMIO_REG(0x40000020, uint32_t)
-#define TRX_STATUS             MMIO_REG(0x40000024, uint32_t)
-#define TRX_IRQ_MASK           MMIO_REG(0x40000028, uint32_t)
-#define TRX_IRQ_STATUS         MMIO_REG(0x4000002c, uint32_t)
-#define TRX_FRAME_RETRIES      MMIO_REG(0x40000030, uint32_t)
-#define TRX_CSMA_RETRIES       MMIO_REG(0x40000034, uint32_t)
-#define TRX_CSMA_MIN_BE        MMIO_REG(0x40000038, uint32_t)
-#define TRX_CSMA_MAX_BE        MMIO_REG(0x4000003c, uint32_t)
-#define TRX_CCA_MODE           MMIO_REG(0x40000040, uint32_t)
-#define TRX_ED_THRESHOLD       MMIO_REG(0x40000044, float)
-#define TRX_RSSI_LEVEL         MMIO_REG(0x40000048, float)
-#define TRX_FRAME_LQI          MMIO_REG(0x4000004c, uint32_t)
-#define TRX_FRAME_RSSI         MMIO_REG(0x40000050, float)
+#define TRX_RX_SENSITIVITY     MMIO_REG(0x40000018, float)
+#define TRX_CHANNEL            MMIO_REG(0x4000001c, uint32_t)
+#define TRX_SFD_VALUE          MMIO_REG(0x40000020, uint32_t)
+#define TRX_STATE              MMIO_REG(0x40000024, uint32_t)
+#define TRX_STATUS             MMIO_REG(0x40000028, uint32_t)
+#define TRX_IRQ_MASK           MMIO_REG(0x4000002c, uint32_t)
+#define TRX_IRQ_STATUS         MMIO_REG(0x40000030, uint32_t)
+#define TRX_FRAME_RETRIES      MMIO_REG(0x40000034, uint32_t)
+#define TRX_CSMA_RETRIES       MMIO_REG(0x40000038, uint32_t)
+#define TRX_CSMA_MIN_BE        MMIO_REG(0x4000003c, uint32_t)
+#define TRX_CSMA_MAX_BE        MMIO_REG(0x40000040, uint32_t)
+#define TRX_CCA_MODE           MMIO_REG(0x40000044, uint32_t)
+#define TRX_ED_THRESHOLD       MMIO_REG(0x40000048, float)
+#define TRX_RSSI_LEVEL         MMIO_REG(0x4000004c, float)
+#define TRX_FRAME_LQI          MMIO_REG(0x40000050, uint32_t)
+#define TRX_FRAME_RSSI         MMIO_REG(0x40000054, float)
 #define TRX_FRAME_BUFFER(i)    MMIO_REG(0x40001000 + (i), uint8_t)
 
-#define DATA                   MMIO_REG(0xee000000, uint32_t)
 #define BREAK                  MMIO_REG(0xff000000, uint32_t)
 
 /*- Types -------------------------------------------------------------------*/

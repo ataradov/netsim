@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+ * Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include "main.h"
 #include "utils.h"
 
 // Random algorithm used here is Complementary Multiply With Carry
@@ -67,7 +68,13 @@ uint32_t rand_next(void)
 //-----------------------------------------------------------------------------
 float randf_next(void)
 {
-  return (float)rand_next() / (float)UINT32_MAX;
+  return (float)rand_next() / (float)0xffffffff;
+}
+
+//-----------------------------------------------------------------------------
+uint64_t get_sim_cycle(void)
+{
+  return g_sim.cycle;
 }
 
 //-----------------------------------------------------------------------------
@@ -88,45 +95,6 @@ void sim_free(void *ptr)
 }
 
 //-----------------------------------------------------------------------------
-void queue_add(queue_t **queue, queue_t *item)
-{
-  item->next = NULL;
-
-  if (NULL == *queue)
-  {
-    *queue = item;
-  }
-  else
-  {
-    queue_t *last = *queue;
-
-    while (last->next)
-     last = last->next;
-
-    last->next = item;
-  }
-}
-
-//-----------------------------------------------------------------------------
-void queue_remove(queue_t **queue, queue_t *item)
-{
-  queue_t *prev = NULL;
-
-  for (queue_t *i = *queue; i; i = i->next)
-  {
-    if (i == item)
-    {
-      if (prev)
-        prev->next = i->next;
-      else
-        *queue = i->next;
-      return;
-    }
-    prev = i;
-  }
-}
-
-//-----------------------------------------------------------------------------
 void error(const char *fmt, ...)
 {
   va_list arg;
@@ -140,5 +108,34 @@ void error(const char *fmt, ...)
   fputs(buf, stderr);
   fputs("\r\n", stderr);
   exit(1);
+}
+
+//-----------------------------------------------------------------------------
+void queue_init(queue_t *queue)
+{
+  queue->next = queue;
+  queue->prev = queue;
+}
+
+//-----------------------------------------------------------------------------
+void queue_add(queue_t *queue, void *item)
+{
+  queue_t *it = (queue_t *)item;
+
+  it->next = queue;
+  it->prev = queue->prev;
+  queue->prev->next = it;
+  queue->prev = it;
+}
+
+//-----------------------------------------------------------------------------
+void queue_remove(queue_t *queue, void *item)
+{
+  queue_t *it = (queue_t *)item;
+
+  it->prev->next = it->next;
+  it->next->prev = it->prev;
+
+  (void)queue;
 }
 

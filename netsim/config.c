@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+ * Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include "main.h"
 #include "utils.h"
 #include "config.h"
 
@@ -32,7 +33,7 @@
 #define CONFIG_EOF             -1
 
 /*- Variables ---------------------------------------------------------------*/
-static char *config_name;
+static const char *config_name;
 static int config_line;
 static int config_col;
 
@@ -70,7 +71,7 @@ static void skip_bytes(char **line, int bytes)
 }
 
 //-----------------------------------------------------------------------------
-static bool check_str(char **line, char *str)
+static bool check_str(char **line, const char *str)
 {
   int len = strlen(str);
 
@@ -160,7 +161,7 @@ static char *get_str(char **line)
 
   skip_bytes(line, len);
 
-  res = sim_malloc(len+1);
+  res = (char *)sim_malloc(len+1);
   memcpy(res, start, len);
   res[len] = 0;
 
@@ -233,10 +234,10 @@ static void process_line(char *line)
     soc->id = get_long(&line);
     soc->path = get_str(&line);
 
-    load_file(soc->path, soc->mem, sizeof(soc->mem));
+    load_file(soc->path, soc->core.ram, sizeof(soc->core.ram));
 
     soc_init(soc);
-    queue_add((queue_t **)&g_sim.socs, (queue_t *)soc);
+    queue_add(&g_sim.active, (queue_t *)soc);
   }
 
   else if (check_str(&line, "sniffer"))
@@ -254,7 +255,7 @@ static void process_line(char *line)
     sniffer->path = get_str(&line);
 
     sniffer_init(sniffer);
-    queue_add((queue_t **)&g_sim.sniffers, (queue_t *)sniffer);
+    queue_add(&g_sim.sniffers, (queue_t *)sniffer);
   }
 
   else if (check_str(&line, "noise"))
@@ -273,7 +274,7 @@ static void process_line(char *line)
     noise->off = get_long(&line);
 
     noise_init(noise);
-    queue_add((queue_t **)&g_sim.noises, (queue_t *)noise);
+    queue_add(&g_sim.noises, (queue_t *)noise);
   }
 
   else
@@ -305,7 +306,7 @@ static int config_getc(int f)
 }
 
 //-----------------------------------------------------------------------------
-void config_read(char *name)
+void config_read(const char *name)
 {
   char line[CONFIG_LINE_SIZE];
   int f, c, ptr;

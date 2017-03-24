@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+ * Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +20,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "io_ops.h"
+#include "soc.h"
 #include "trx.h"
 #include "main.h"
 #include "utils.h"
@@ -33,10 +35,8 @@
 #define TURNAROUND_TIME        12 // symbols
 #define PHY_SHR_DURATION       10 // symbols
 #define PHY_PHR_DURATION       2  // symbols
-
 #define ACK_WAIT_DURATION      ((UNIT_BACKOFF_PERIOD + TURNAROUND_TIME + PHY_SHR_DURATION + \
                                  6*SYMBOLS_PER_OCTET) * SYMBOL_DURATION)
-
 #define PHY_PHR_OFFSET         0
 #define PHY_PSDU_OFFSET        1
 #define PHY_MAX_PSDU_SIZE      127
@@ -129,7 +129,8 @@ void trx_init(trx_t *trx)
   trx->reg.short_addr      = 0;
   trx->reg.ieee_addr_0     = 0;
   trx->reg.ieee_addr_1     = 0;
-  trx->reg.tx_power        = 3.0f;
+  trx->reg.tx_power        = 3.0f; // dBm
+  trx->reg.rx_sensitivity  = -100.0f; // dBm
   trx->reg.channel         = 2425;
   trx->reg.sfd             = 0xa7;
   trx->reg.state           = TRX_STATE_IDLE;
@@ -451,19 +452,49 @@ static void trx_rx_end_cb(event_t *event)
   trx->rx = false;
   trx->rx_trx_lock = false;
 
+  if (trx->rx_rssi < trx->reg.rx_sensitivity)
+    trx->rx_rssi = trx->reg.rx_sensitivity;
+
   if (TRX_STATE_RX_WAIT_END != trx->reg.state &&
       TRX_STATE_RX_WAIT_END_AACK != trx->reg.state)
     error("%s: spurious trx_rx_end_cb()", trx->name);
 
-  // This approximates the dependency from a real radio.
-  p_loss = (tanhf((0.5 - trx->rx_lqi) * 5.5) + 1.0) / 2.0;
   random = randf_next();
 
-  if (p_loss > random)
+  // This approximates the dependency from a real radio.
+  p_loss = (tanhf((0.5 - trx->rx_lqi) * 5.5) + 1.0) / 2.0;
+
+  if (random < p_loss)
   {
-    TRX_DBG(trx, "Frame is randomly lost due to LQI (P_loss = %.5f, random = %.5f)", p_loss, random);
+    TRX_DBG(trx, "Frame is randomly lost due to LQI (LQI = %.4f, P_loss = %.5f, random = %.5f)",
+        trx->rx_lqi, p_loss, random);
     trx->rx_crc_ok = false;
   }
+
+/*
+  // This approximates the dependency from a real world. The IEEE 802.15.4 specification
+  // defines sensitivity as 1% PER with 20 byte frames. But that only works with absolutely
+  // no interference. In real life, there is almost 100% PER at the sensetivity level. 
+  const float rssi_mult = 0.07f;
+  p_loss = (expf(-trx->rx_rssi * rssi_mult) - 1.0f) / expf(-trx->reg.rx_sensitivity * rssi_mult);
+
+  if (random < p_loss)
+  {
+    TRX_DBG(trx, "Frame is randomly lost due to RSSI (RSSI = %.2f, P_loss = %.5f, random = %.5f)",
+       trx->rx_rssi, p_loss, random);
+    trx->rx_crc_ok = false;
+  }
+
+  // This is just some additional random loss
+  p_loss = 0.05; // 0.5%
+
+  if (random < p_loss)
+  {
+    TRX_DBG(trx, "Frame is randomly lost due to reasons (P_loss = %.5f, random = %.5f)",
+        p_loss, random);
+    trx->rx_crc_ok = false;
+  }
+*/
 
   if (!trx->rx_crc_ok)    // Damage the buffer so that even if application checks
     trx->buf[1] ^= 0xff;  // the CRC manually, it will fail.
@@ -473,7 +504,7 @@ static void trx_rx_end_cb(event_t *event)
   trx->reg.frame_lqi = lround(trx->rx_lqi * 255);
   trx->reg.frame_rssi = trx->rx_rssi;
 
-  TRX_DBG(trx, "RX end from %s, LQI = %.2f (%d), RSSI = %.2f, CRC = %s",
+  TRX_DBG(trx, "RX end from %s, LQI = %.4f (%d), RSSI = %.2f, CRC = %s",
       trx->rx_trx ? trx->rx_trx->name : "<unknown>", trx->rx_lqi, trx->reg.frame_lqi,
       trx->rx_rssi, trx->rx_crc_ok ? "OK" : "Fail");
 
@@ -765,7 +796,9 @@ static inline bool trx_config(trx_t *trx, uint32_t bit)
 static inline void trx_interrupt(trx_t *trx, uint32_t status)
 {
   trx->reg.irq_status |= status & trx->reg.irq_mask;
-  //  TODO: call interrupt handler
+
+  if (trx->reg.irq_status & trx->reg.irq_mask)
+    soc_irq_set(SOC(trx), trx->irq);
 }
 
 //-----------------------------------------------------------------------------
@@ -804,38 +837,56 @@ static bool trx_check_crc(uint8_t *data)
 }
 
 //-----------------------------------------------------------------------------
-uint8_t trx_read_b(trx_t *trx, uint32_t addr)
+static uint8_t trx_read_b(trx_t *trx, uint32_t addr)
 {
   uint8_t *m = (uint8_t *)trx->buf;
-  return m[addr & TRX_REG_MASK];
+  return m[addr - TRX_FRAME_START_REG];
 }
 
 //-----------------------------------------------------------------------------
-uint32_t trx_read_w(trx_t *trx, uint32_t addr)
+static uint32_t trx_read_w(trx_t *trx, uint32_t addr)
 {
   uint32_t *m = (uint32_t *)&trx->reg;
-  return m[(addr & TRX_REG_MASK) >> 2];
+  return m[addr >> 2];
 }
 
 //-----------------------------------------------------------------------------
-void trx_write_b(trx_t *trx, uint32_t addr, uint8_t data)
+static void trx_write_b(trx_t *trx, uint32_t addr, uint8_t data)
 {
   uint8_t *m = (uint8_t *)trx->buf;
-  m[addr & TRX_REG_MASK] = data;
+  m[addr - TRX_FRAME_START_REG] = data;
 }
 
 //-----------------------------------------------------------------------------
-void trx_write_w(trx_t *trx, uint32_t addr, uint32_t data)
+static void trx_write_w(trx_t *trx, uint32_t addr, uint32_t data)
 {
   uint32_t *m = (uint32_t *)&trx->reg;
-
-  addr &= TRX_REG_MASK;
 
   if (TRX_STATE_REG == addr)
+  {
     trx_set_state(trx, data);
+  }
   else if (TRX_IRQ_STATUS_REG == addr)
+  {
     trx->reg.irq_status &= ~data;
+
+    if (0 == (trx->reg.irq_status & trx->reg.irq_mask))
+      soc_irq_clear(SOC(trx), trx->irq);
+  }
   else
+  {
     m[addr >> 2] = data;
+  }
 }
+
+//-----------------------------------------------------------------------------
+io_ops_t trx_ops =
+{
+  .read_b  = (io_read_b_t)trx_read_b,
+  .read_h  = (io_read_h_t)NULL,
+  .read_w  = (io_read_w_t)trx_read_w,
+  .write_b = (io_write_b_t)trx_write_b,
+  .write_h = (io_write_h_t)NULL,
+  .write_w = (io_write_w_t)trx_write_w,
+};
 

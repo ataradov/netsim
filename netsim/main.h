@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+ * Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,12 +21,8 @@
 /*- Includes ----------------------------------------------------------------*/
 #include <stdint.h>
 #include <stdbool.h>
+#include "utils.h"
 #include "config.h"
-
-/*- Definitions -------------------------------------------------------------*/
-#define DEBUG_CORE         0
-#define DEBUG_TRX          1
-#define DEBUG_NOISE        0
 
 /*- Types -------------------------------------------------------------------*/
 typedef struct
@@ -34,13 +30,14 @@ typedef struct
   uint32_t     seed;
   uint32_t     time;
   float        scale;
-
   uint32_t     uid;
-  soc_t        *socs;
-  trx_t        *trxs;
-  noise_t      *noises;
-  sniffer_t    *sniffers;
   uint64_t     cycle;
+
+  queue_t      active;
+  queue_t      sleeping;
+  queue_t      trxs;
+  queue_t      noises;
+  queue_t      sniffers;
 } sim_t;
 
 /*- Variables ---------------------------------------------------------------*/

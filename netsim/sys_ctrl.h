@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+ * Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 
 /*- Includes ----------------------------------------------------------------*/
 #include <stdint.h>
+#include "io_ops.h"
 
 /*- Types -------------------------------------------------------------------*/
 enum
@@ -27,7 +28,7 @@ enum
   SYS_CTRL_UID         = 0x00,
   SYS_CTRL_ID          = 0x04,
   SYS_CTRL_RAND        = 0x08,
-  SYS_CTRL_REG_MASK    = 0xff,
+  SYS_CTRL_LOG         = 0x0c,
 };
 
 typedef struct
@@ -37,7 +38,9 @@ typedef struct
 
 /*- Prototypes --------------------------------------------------------------*/
 void sys_ctrl_init(sys_ctrl_t *sys_ctrl);
-uint32_t sys_ctrl_read_w(sys_ctrl_t *sys_ctrl, uint32_t addr);
+
+/*- Variables ---------------------------------------------------------------*/
+extern io_ops_t sys_ctrl_ops;
 
 #endif // _SYS_CTRL_H_
 

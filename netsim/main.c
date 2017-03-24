@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+ * Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@
 #include <sys/time.h>
 #include "trx.h"
 #include "soc.h"
-#include "mem.h"
+#include "main.h"
 #include "utils.h"
 #include "config.h"
 
@@ -95,10 +95,12 @@ static void sim_init(void)
   g_sim.scale = 1.0f;
 
   g_sim.uid = 0;
-  g_sim.socs = NULL;
-  g_sim.trxs = NULL;
-  g_sim.noises = NULL;
-  g_sim.sniffers = NULL;
+
+  queue_init(&g_sim.active);
+  queue_init(&g_sim.sleeping);
+  queue_init(&g_sim.trxs);
+  queue_init(&g_sim.noises);
+  queue_init(&g_sim.sniffers);
 }
 
 //-----------------------------------------------------------------------------
@@ -120,12 +122,16 @@ int main(int argc, char *argv[])
 
   measure_time();
 
-  for (g_sim.cycle = 0; g_sim.cycle < g_sim.time; g_sim.cycle++)
+  for (g_sim.cycle = 0; g_sim.cycle < g_sim.time; )
   {
-    for (soc_t *soc = g_sim.socs; soc; soc = soc->next)
+    if (queue_is_empty(&g_sim.active))
+      g_sim.cycle += events_jump();
+
+    queue_foreach(soc_t, soc, &g_sim.active)
       soc_clk(soc);
 
     events_tick();
+    g_sim.cycle++;
   }
 
   measure_time();

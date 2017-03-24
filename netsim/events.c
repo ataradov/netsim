@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+ * Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,89 +19,76 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include "utils.h"
 #include "events.h"
 
 /*- Variables ---------------------------------------------------------------*/
 static event_t *events = NULL;
+static event_t *last_event = NULL;
 
 /*- Implementations ---------------------------------------------------------*/
 
 //-----------------------------------------------------------------------------
 void events_add(event_t *event)
 {
-  if (events)
+  event->time = get_sim_cycle() + event->timeout;
+
+  if (NULL == events)
   {
-    event_t *next = events;
-    event_t *prev = NULL;
-    int time = 0;
-    int diff;
-
-    while (next && (time + next->counter) < event->timeout)
-    {
-      time += next->counter;
-      prev = next;
-      next = next->next;
-    }
-
-    diff = event->timeout - time;
-
-    if (next)
-    {
-      event->next = next;
-      event->counter = diff;
-      next->counter -= diff;
-      if (prev)
-        prev->next = event;
-      else
-        events = event;
-    }
-    else
-    {
-      event->next = NULL;
-      event->counter = diff;
-      if (prev)
-        prev->next = event;
-      else
-        events = event;
-    }
+    event->next = NULL;
+    events = event;
+    last_event = event;
+  }
+  else if (event->time >= last_event->time)
+  {
+    event->next = NULL;
+    last_event->next = event;
+    last_event = event;
+  }
+  else if (event->time <= events->time)
+  {
+    event->next = events;
+    events = event;
   }
   else
   {
-    event->next = NULL;
-    event->counter = event->timeout;
-    events = event;
+    event_t *next, *prev = NULL;
+
+    for (next = events; next->time < event->time; next = next->next)
+      prev = next;
+
+    event->next = next;
+    prev->next = event;
   }
 }
 
 //-----------------------------------------------------------------------------
 void events_remove(event_t *event)
 {
-  event_t *prev = NULL;
+  event_t *ev, *prev = NULL;
 
-  for (event_t *e = events; e; e = e->next)
+  for (ev = events; ev && ev != event; ev = ev->next)
+    prev = ev;
+
+  if (NULL == prev)
   {
-    if (e == event)
-    {
-      if (prev)
-        prev->next = e->next;
-      else
-        events = e->next;
+    events = event->next;
+  }
+  else if (ev)
+  {
+    prev->next = event->next;
 
-      if (e->next)
-        e->next->counter += e->counter;
-
-      return;
-    }
-    prev = e;
+    if (NULL == event->next)
+      last_event = prev;
   }
 }
 
 //-----------------------------------------------------------------------------
 bool events_is_planned(event_t *event)
 {
-  for (event_t *e = events; e; e = e->next)
+  for (event_t *ev = events; ev; ev = ev->next)
   {
-    if (e == event)
+    if (ev == event)
       return true;
   }
 
@@ -111,17 +98,25 @@ bool events_is_planned(event_t *event)
 //-----------------------------------------------------------------------------
 void events_tick(void)
 {
-  if (NULL == events)
-    return;
+  uint64_t cycle = get_sim_cycle();
 
-  events->counter--;
-
-  while (events && 0 == events->counter)
+  while (events && cycle == events->time)
   {
     event_t *event = events;
-
     events = events->next;
     event->callback(event);
   }
 }
+
+//-----------------------------------------------------------------------------
+uint64_t events_jump(void)
+{
+  uint64_t delta = 0;
+
+  if (events)
+    delta = events->time - get_sim_cycle();
+
+  return delta;
+}
+
 

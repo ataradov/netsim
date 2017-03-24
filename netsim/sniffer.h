@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+ * Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,12 +20,13 @@
 
 /*- Includes ----------------------------------------------------------------*/
 #include <stdbool.h>
+#include "utils.h"
 #include "sniffer.h"
 
 /*- Types -------------------------------------------------------------------*/
 typedef struct sniffer_t
 {
-  struct sniffer_t *next;
+  queue_t      queue;
 
   char         *name;
   float        x;

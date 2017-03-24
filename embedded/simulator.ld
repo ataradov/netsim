@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+ * Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -31,14 +31,17 @@ MEMORY
   ram  (rwx) : ORIGIN = 0x00010000, LENGTH = 0x10000 /* 64k */
 }
 
-ENTRY(_entry)
+__top_flash = ORIGIN(flash) + LENGTH(flash);
+__top_ram = ORIGIN(ram) + LENGTH(ram);
+
+ENTRY(irq_handler_reset)
 
 SECTIONS
 {
   .text : ALIGN(4)
   {
     FILL(0xff)
-    *(.text._entry)
+    KEEP(*(.vectors))
     *(.text*)
     *(.rodata)
     *(.rodata.*)
@@ -65,5 +68,6 @@ SECTIONS
     _ebss = .;
     PROVIDE(_end = .);
   } > ram
-}
 
+  PROVIDE(_stack_top = __top_ram);
+}

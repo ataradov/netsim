@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+ * Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,15 +20,10 @@
 
 /*- Includes ----------------------------------------------------------------*/
 #include "trx.h"
-#include "mem.h"
 #include "sys_ctrl.h"
 #include "sys_timer.h"
-
-#ifdef USE_LIBCORE
-  #include "libcore/core.h"
-#else
-  #include "core.h"
-#endif
+#include "utils.h"
+#include "core.h"
 
 /*- Definitions -------------------------------------------------------------*/
 #define SOC_PERIPHERALS_SIZE   256
@@ -40,7 +35,7 @@
 /*- Types -------------------------------------------------------------------*/
 typedef struct soc_t
 {
-  struct soc_t *next;
+  queue_t      queue;
 
   char         *name;
   float        x;
@@ -50,7 +45,6 @@ typedef struct soc_t
 
   long         uid;
   core_t       core;
-  uint8_t      mem[MEM_SIZE];
   sys_ctrl_t   sys_ctrl;
   sys_timer_t  sys_timer;
   trx_t        trx;
@@ -60,16 +54,24 @@ typedef struct soc_t
 
 enum
 {
-  SOC_ID_MEM           = 0x00,
   SOC_ID_SYS_CTRL      = 0x01,
   SOC_ID_SYS_TIMER     = 0x02,
   SOC_ID_TRX           = 0x40,
+};
+
+enum
+{
+  SOC_IRQ_TRX          = 0,
+  SOC_IRQ_SYS_TIMER    = 1,
 };
 
 /*- Prototypes --------------------------------------------------------------*/
 void soc_setup(void);
 void soc_init(soc_t *soc);
 void soc_clk(soc_t *soc);
+void soc_irq_set(soc_t *soc, int irq);
+void soc_irq_clear(soc_t *soc, int irq);
+
 uint8_t soc_read_b(soc_t *soc, uint32_t addr);
 uint16_t soc_read_h(soc_t *soc, uint32_t addr);
 uint32_t soc_read_w(soc_t *soc, uint32_t addr);

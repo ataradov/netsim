@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+ * Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,9 +23,7 @@
 #include <stdbool.h>
 
 /*- Definitions -------------------------------------------------------------*/
-#define SP     13
-#define LR     14
-#define PC     15
+#define CORE_RAM_SIZE    128*1024 // Must be a power of 2
 
 /*- Types -------------------------------------------------------------------*/
 typedef struct
@@ -38,8 +36,14 @@ typedef struct
   bool         c;
   bool         v;
 
+  uint32_t     irqs;
+  uint32_t     ipsr;
+  bool         pm;
+  bool         sleeping;
+
   uint16_t     opcode;
 
+  uint8_t      ram[CORE_RAM_SIZE];
   uint16_t     *flash;
   void         *soc;
 } core_t;
@@ -48,6 +52,8 @@ typedef struct
 void core_setup(void);
 void core_init(core_t *core);
 void core_clk(core_t *core);
+void core_irq_set(core_t *core, int irq);
+void core_irq_clear(core_t *core, int irq);
 
 #endif // _CORE_H_
 

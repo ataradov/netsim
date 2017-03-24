@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+ * Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,10 +21,15 @@
 /*- Includes ----------------------------------------------------------------*/
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <inttypes.h>
-#include "main.h"
 
 /*- Definitions -------------------------------------------------------------*/
+#define DEBUG_CORE         0
+#define DEBUG_TRX          0
+#define DEBUG_NOISE        0
+#define DEBUG_LOG          1
+
 #define MHz    1000000.0f
 
 #define max(a, b) \
@@ -46,11 +51,16 @@
 #define CORE_DBG(_mod, _fmt, ...)   DEBUG(CORE, _mod, _fmt, ##__VA_ARGS__)
 #define TRX_DBG(_mod, _fmt, ...)    DEBUG(TRX, _mod, _fmt, ##__VA_ARGS__)
 #define NOISE_DBG(_mod, _fmt, ...)  DEBUG(NOISE, _mod, _fmt, ##__VA_ARGS__)
+#define LOG_DBG(_mod, _fmt, ...)    DEBUG(LOG, _mod, _fmt, ##__VA_ARGS__)
+
+#define queue_foreach(t, v, q) \
+  for (t *v = (t*)(q)->next, *__next = (t*)v->queue.next; (t*)(q) != v; v = __next, __next = (t*)v->queue.next)
 
 /*- Types -------------------------------------------------------------------*/
 typedef struct queue_t
 {
   struct queue_t *next;
+  struct queue_t *prev;
 } queue_t;
 
 /*- Prototypes --------------------------------------------------------------*/
@@ -58,13 +68,24 @@ void rand_init(uint32_t state);
 uint32_t rand_next(void);
 float randf_next(void);
 
+uint64_t get_sim_cycle(void);
+
 void *sim_malloc(int size);
 void sim_free(void *ptr);
 
-void queue_add(queue_t **queue, queue_t *item);
-void queue_remove(queue_t **queue, queue_t *item);
-
 void error(const char *fmt, ...);
+
+void queue_init(queue_t *queue);
+void queue_add(queue_t *queue, void *item);
+void queue_remove(queue_t *queue, void *item);
+
+/*- Implementations ---------------------------------------------------------*/
+
+//-----------------------------------------------------------------------------
+static inline bool queue_is_empty(queue_t *queue)
+{
+  return (queue->next == queue);
+}
 
 #endif // _UTILS_H_
 

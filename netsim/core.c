@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+ * Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,11 +22,23 @@
 #include <stdbool.h>
 #include "soc.h"
 #include "core.h"
+#include "main.h"
 #include "utils.h"
 
 /*- Definitions -------------------------------------------------------------*/
 #define HASH_TABLE_SIZE        0x10000  // 64k
 #define ARRAY_SIZE(a)          (sizeof(a) / sizeof(a[0]))
+
+#define SP     13
+#define LR     14
+#define PC     15
+
+#define BIT_N  31
+#define BIT_Z  30
+#define BIT_C  29
+#define BIT_V  28
+#define BIT_T  24
+#define BIT_A  9
 
 /* Instruction fields bitmaps and macros that extract them:
   _____________rrr      r = GET_R1()
@@ -94,6 +106,118 @@ typedef struct
 static handler_t *hash[HASH_TABLE_SIZE];
 
 /*- Implementations ---------------------------------------------------------*/
+
+//-----------------------------------------------------------------------------
+static inline uint8_t read_b(core_t *core, uint32_t addr)
+{
+  if (addr < CORE_RAM_SIZE)
+    return ((uint8_t *)core->ram)[addr];
+  else
+    return soc_read_b((soc_t *)core->soc, addr);
+}
+
+//-----------------------------------------------------------------------------
+static inline uint16_t read_h(core_t *core, uint32_t addr)
+{
+  if (addr < CORE_RAM_SIZE)
+    return ((uint16_t *)core->ram)[addr >> 1];
+  else
+    return soc_read_h((soc_t *)core->soc, addr);
+}
+
+//-----------------------------------------------------------------------------
+static inline uint32_t read_w(core_t *core, uint32_t addr)
+{
+  if (addr < CORE_RAM_SIZE)
+    return ((uint32_t *)core->ram)[addr >> 2];
+  else
+    return soc_read_w((soc_t *)core->soc, addr);
+}
+
+//-----------------------------------------------------------------------------
+static inline void write_b(core_t *core, uint32_t addr, uint8_t data)
+{
+  if (addr < CORE_RAM_SIZE)
+    ((uint8_t *)core->ram)[addr] = data;
+  else
+    soc_write_b((soc_t *)core->soc, addr, data);
+}
+
+//-----------------------------------------------------------------------------
+static inline void write_h(core_t *core, uint32_t addr, uint16_t data)
+{
+  if (addr < CORE_RAM_SIZE)
+    ((uint16_t *)core->ram)[addr >> 1] = data;
+  else
+    soc_write_h((soc_t *)core->soc, addr, data);
+}
+
+//-----------------------------------------------------------------------------
+static inline void write_w(core_t *core, uint32_t addr, uint32_t data)
+{
+  if (addr < CORE_RAM_SIZE)
+    ((uint32_t *)core->ram)[addr >> 2] = data;
+  else
+    soc_write_w((soc_t *)core->soc, addr, data);
+}
+
+//-----------------------------------------------------------------------------
+static void core_exception_enter(core_t *core)
+{
+  uint32_t *ram = (uint32_t *)core->ram;
+  uint32_t frameptr, align, number, xpsr;
+
+  for (number = 0; number < 32; number++)
+    if (core->irqs & (1 << number))
+      break;
+
+  align = (core->r[SP] >> 2) & 1;
+  core->ipsr = 16 + number;
+  xpsr = (core->n << BIT_N) | (core->z << BIT_Z) | (core->c << BIT_C) |
+      (core->v << BIT_V) | (1 << BIT_T) | (align << BIT_A) | core->ipsr;
+
+  core->r[SP] = (core->r[SP] - 0x20) & 0xfffffffb;
+  frameptr = core->r[SP];
+
+  write_w(core, frameptr + 0x00, core->r[0]);
+  write_w(core, frameptr + 0x04, core->r[1]);
+  write_w(core, frameptr + 0x08, core->r[2]);
+  write_w(core, frameptr + 0x0c, core->r[3]);
+  write_w(core, frameptr + 0x10, core->r[12]);
+  write_w(core, frameptr + 0x14, core->r[LR]);
+  write_w(core, frameptr + 0x18, core->r[PC]);
+  write_w(core, frameptr + 0x1c, xpsr);
+
+  core->r[LR] = 0xfffffff9;
+  core->r[PC] = ram[core->ipsr] & 0xfffffffe;
+}
+
+//-----------------------------------------------------------------------------
+static void core_exception_return(core_t *core)
+{
+  uint32_t frameptr, xpsr, align;
+
+  frameptr = core->r[SP];
+
+  core->r[0] = read_w(core, frameptr + 0x00);
+  core->r[1] = read_w(core, frameptr + 0x04);
+  core->r[2] = read_w(core, frameptr + 0x08);
+  core->r[3] = read_w(core, frameptr + 0x0c);
+  core->r[12] = read_w(core, frameptr + 0x10);
+  core->r[LR] = read_w(core, frameptr + 0x14);
+  core->r[PC] = read_w(core, frameptr + 0x18);
+  xpsr = read_w(core, frameptr + 0x1c);
+
+  align = (xpsr >> BIT_A) & 1;
+  core->r[SP] = (core->r[SP] + 0x20) | (align << 2);
+
+  core->n = (xpsr & (1 << BIT_N)) > 0;
+  core->z = (xpsr & (1 << BIT_Z)) > 0;
+  core->c = (xpsr & (1 << BIT_C)) > 0;
+  core->v = (xpsr & (1 << BIT_V)) > 0;
+
+  core->ipsr = 0;
+}
 
 //-----------------------------------------------------------------------------
 static inline bool overflow(uint32_t a, uint32_t b, uint32_t r)
@@ -799,6 +923,9 @@ static void i_bx_reg4(core_t *core)
   CORE_DBG(core, "bx\tr%d", r);
 
   core->r[PC] = core->r[r] & 0xfffffffe;
+
+  if (core->ipsr && 0xf0000000 == (core->r[r] & 0xf0000000))
+    core_exception_return(core);
 }
 
 //-----------------------------------------------------------------------------
@@ -822,7 +949,7 @@ static void i_ldr_pc(core_t *core)
 
   CORE_DBG(core, "ldr\tr%d, [PC, 0x%02x]", rd, imm);
 
-  core->r[rd] = soc_read_w(core->soc, core->r[PC] + imm + 2);
+  core->r[rd] = read_w(core, core->r[PC] + imm + 2);
 }
 
 //-----------------------------------------------------------------------------
@@ -834,7 +961,7 @@ static void i_str_reg(core_t *core)
 
   CORE_DBG(core, "str\tr%d, [r%d, r%d]", r1, r2, r3);
 
-  soc_write_w(core->soc, core->r[r2] + core->r[r3], core->r[r1]);
+  write_w(core, core->r[r2] + core->r[r3], core->r[r1]);
 }
 
 //-----------------------------------------------------------------------------
@@ -846,7 +973,7 @@ static void i_strh_reg(core_t *core)
 
   CORE_DBG(core, "strh\tr%d, [r%d, r%d]", r1, r2, r3);
 
-  soc_write_h(core->soc, core->r[r2] + core->r[r3], core->r[r1]);
+  write_h(core, core->r[r2] + core->r[r3], core->r[r1]);
 }
 
 //-----------------------------------------------------------------------------
@@ -858,7 +985,7 @@ static void i_strb_reg(core_t *core)
 
   CORE_DBG(core, "strb\tr%d, [r%d, r%d]", r1, r2, r3);
 
-  soc_write_b(core->soc, core->r[r2] + core->r[r3], core->r[r1]);
+  write_b(core, core->r[r2] + core->r[r3], core->r[r1]);
 }
 
 //-----------------------------------------------------------------------------
@@ -871,7 +998,7 @@ static void i_ldrsb_reg(core_t *core)
 
   CORE_DBG(core, "ldrsb\tr%d, [r%d, r%d]", r1, r2, r3);
 
-  val = soc_read_b(core->soc, core->r[r2] + core->r[r3]);
+  val = read_b(core, core->r[r2] + core->r[r3]);
   core->r[r1] = (val & 0xff) | ((val & 0x80) ? 0xffffff00 : 0);
 }
 
@@ -884,7 +1011,7 @@ static void i_ldr_reg(core_t *core)
 
   CORE_DBG(core, "ldr\tr%d, [r%d, r%d]", r1, r2, r3);
 
-  core->r[r1] = soc_read_w(core->soc, core->r[r2] + core->r[r3]);
+  core->r[r1] = read_w(core, core->r[r2] + core->r[r3]);
 }
 
 //-----------------------------------------------------------------------------
@@ -896,7 +1023,7 @@ static void i_ldrh_reg(core_t *core)
 
   CORE_DBG(core, "ldrh\tr%d, [r%d, r%d]", r1, r2, r3);
 
-  core->r[r1] = soc_read_h(core->soc, core->r[r2] + core->r[r3]);
+  core->r[r1] = read_h(core, core->r[r2] + core->r[r3]);
 }
 
 //-----------------------------------------------------------------------------
@@ -908,7 +1035,7 @@ static void i_ldrb_reg(core_t *core)
 
   CORE_DBG(core, "ldrb\tr%d, [r%d, r%d]", r1, r2, r3);
 
-  core->r[r1] = soc_read_b(core->soc, core->r[r2] + core->r[r3]);
+  core->r[r1] = read_b(core, core->r[r2] + core->r[r3]);
 }
 
 //-----------------------------------------------------------------------------
@@ -921,7 +1048,7 @@ static void i_ldrsh_reg(core_t *core)
 
   CORE_DBG(core, "ldrsh\tr%d, [r%d, r%d]", r1, r2, r3);
 
-  val = soc_read_h(core->soc, core->r[r2] + core->r[r3]);
+  val = read_h(core, core->r[r2] + core->r[r3]);
   core->r[r1] = val | ((val & 0x8000) ? 0xffff0000 : 0);
 }
 
@@ -934,7 +1061,7 @@ static void i_str_imm(core_t *core)
 
   CORE_DBG(core, "str\tr%d, [r%d, 0x%02x]", r1, r2, imm);
 
-  soc_write_w(core->soc, core->r[r2] + imm, core->r[r1]);
+  write_w(core, core->r[r2] + imm, core->r[r1]);
 }
 
 //-----------------------------------------------------------------------------
@@ -946,7 +1073,7 @@ static void i_ldr_imm(core_t *core)
 
   CORE_DBG(core, "ldr\tr%d, [r%d, 0x%02x]", r1, r2, imm);
 
-  core->r[r1] = soc_read_w(core->soc, core->r[r2] + imm);
+  core->r[r1] = read_w(core, core->r[r2] + imm);
 }
 
 //-----------------------------------------------------------------------------
@@ -958,7 +1085,7 @@ static void i_strb_imm(core_t *core)
 
   CORE_DBG(core, "strb\tr%d, [r%d, 0x%02x]", r1, r2, imm);
 
-  soc_write_b(core->soc, core->r[r2] + imm, core->r[r1]);
+  write_b(core, core->r[r2] + imm, core->r[r1]);
 }
 
 //-----------------------------------------------------------------------------
@@ -970,7 +1097,7 @@ static void i_ldrb_imm(core_t *core)
 
   CORE_DBG(core, "ldrb\tr%d, [r%d, 0x%02x]", r1, r2, imm);
 
-  core->r[r1] = soc_read_b(core->soc, core->r[r2] + imm);
+  core->r[r1] = read_b(core, core->r[r2] + imm);
 }
 
 //-----------------------------------------------------------------------------
@@ -982,7 +1109,7 @@ static void i_strh_imm(core_t *core)
 
   CORE_DBG(core, "strh\tr%d, [r%d, 0x%02x]", r1, r2, imm);
 
-  soc_write_h(core->soc, core->r[r2] + imm, core->r[r1]);
+  write_h(core, core->r[r2] + imm, core->r[r1]);
 }
 
 //-----------------------------------------------------------------------------
@@ -994,7 +1121,7 @@ static void i_ldrh_imm(core_t *core)
 
   CORE_DBG(core, "ldrh\tr%d, [r%d, 0x%02x]", r1, r2, imm);
 
-  core->r[r1] = soc_read_h(core->soc, core->r[r2] + imm);
+  core->r[r1] = read_h(core, core->r[r2] + imm);
 }
 
 //-----------------------------------------------------------------------------
@@ -1005,7 +1132,7 @@ static void i_str_r_sp_imm(core_t *core)
 
   CORE_DBG(core, "str\tr%d, [SP, 0x%02x]", rd, imm);
 
-  soc_write_w(core->soc, core->r[SP] + imm, core->r[rd]);
+  write_w(core, core->r[SP] + imm, core->r[rd]);
 }
 
 //-----------------------------------------------------------------------------
@@ -1016,7 +1143,7 @@ static void i_ldr_r_sp_imm(core_t *core)
 
   CORE_DBG(core, "ldr\tr%d, [SP, 0x%02x]", rd, imm);
 
-  core->r[rd] = soc_read_w(core->soc, core->r[SP] + imm);
+  core->r[rd] = read_w(core, core->r[SP] + imm);
 }
 
 //-----------------------------------------------------------------------------
@@ -1121,7 +1248,7 @@ static void i_push(core_t *core)
   if (lr)
   {
     addr -= 4;
-    soc_write_w(core->soc, addr, core->r[LR]);
+    write_w(core, addr, core->r[LR]);
   }
 
   for (int i = 7; i >= 0; i--)
@@ -1129,7 +1256,7 @@ static void i_push(core_t *core)
     if (list & (1 << i))
     {
       addr -= 4;
-      soc_write_w(core->soc, addr, core->r[i]);
+      write_w(core, addr, core->r[i]);
     }
   }
 
@@ -1141,7 +1268,7 @@ static void i_pop(core_t *core)
 {
   int list = GET_IMM8(core->opcode);
   int pc = GET_EXTRA_REG(core->opcode);
-  uint32_t addr;
+  uint32_t addr, pc_val;
 
   CORE_DBG(core, "pop\t{%d, 0x%02x}", pc, list);
 
@@ -1151,24 +1278,38 @@ static void i_pop(core_t *core)
   {
     if (list & (1 << i))
     {
-      core->r[i] = soc_read_w(core->soc, addr);
+      core->r[i] = read_w(core, addr);
       addr += 4;
     }
   }
 
   if (pc)
   {
-    core->r[PC] = soc_read_w(core->soc, addr) & 0xfffffffe;
+    pc_val = read_w(core, addr);
+    core->r[PC] = pc_val & 0xfffffffe;
     addr += 4;
   }
 
   core->r[SP] = addr;
+
+  if (core->ipsr && pc && 0xf0000000 == (pc_val & 0xf0000000))
+    core_exception_return(core);
 }
 
 //-----------------------------------------------------------------------------
-static void i_cps(core_t *core)
+static void i_cpsie(core_t *core)
 {
-  error("%s: cps not implemented at 0x%08x", core->name, core->r[PC]-2);
+  CORE_DBG(core, "cpsie\ti");
+
+  core->pm = true;
+}
+
+//-----------------------------------------------------------------------------
+static void i_cpsid(core_t *core)
+{
+  CORE_DBG(core, "cpsid\ti");
+
+  core->pm = false;
 }
 
 //-----------------------------------------------------------------------------
@@ -1240,6 +1381,11 @@ static void i_wfe(core_t *core)
 static void i_wfi(core_t *core)
 {
   CORE_DBG(core, "wfi");
+
+  soc_t *soc = SOC(core);
+  queue_remove(&g_sim.active, (queue_t *)soc);
+  queue_add(&g_sim.sleeping, (queue_t *)soc);
+  core->sleeping = true;
 }
 
 //-----------------------------------------------------------------------------
@@ -1263,7 +1409,7 @@ static void i_stm(core_t *core)
   {
     if (list & (1 << i))
     {
-      soc_write_w(core->soc, addr, core->r[i]);
+      write_w(core, addr, core->r[i]);
       addr += 4;
     }
   }
@@ -1286,7 +1432,7 @@ static void i_ldm(core_t *core)
   {
     if (list & (1 << i))
     {
-      core->r[i] = soc_read_w(core->soc, addr);
+      core->r[i] = read_w(core, addr);
       addr += 4;
     }
   }
@@ -1324,7 +1470,7 @@ static void i_b_c_imm(core_t *core)
 
   imm |= (imm & 0x100) ? 0xfffffe00 : 0x00000000;
 
-  char *conds[] = {"eq", "ne", "cs", "cc", "mi", "pl", "vs", "vc", "hi", "ls", "ge", "lt", "gt", "le", "?", "?"};
+  const char *conds[] = {"eq", "ne", "cs", "cc", "mi", "pl", "vs", "vc", "hi", "ls", "ge", "lt", "gt", "le", "?", "?"};
   CORE_DBG(core, "b%s\t0x%x [%s]", conds[cond], core->r[PC] + imm + 2, passed ? "taken" : "not taken");
 
   if (passed)
@@ -1399,22 +1545,63 @@ static void i_32bit(core_t *core)
   {
     int rd = GET32_RD(opcode);
     uint32_t imm = GET32_IMM8(opcode);
+    uint32_t immh = (imm >> 3) & 0x1f;
+    uint32_t imml = imm & 0x7;
 
     CORE_DBG(core, "mrs\tr%d, 0x%02x", rd, imm);
-    // TODO: implement
 
-    error("%s: mrs not implemented at 0x%08x", core->name, core->r[PC]-2);
+    core->r[rd] = 0;
+
+    if (0 == immh)
+    {
+      if (imm & 1)
+        core->r[rd] |= core->ipsr;
+
+      if (0 == (imm & 4))
+        core->r[rd] |= (core->n << BIT_N) | (core->z << BIT_Z) | (core->c << BIT_C) | (core->v << BIT_V);
+    }
+    else if (1 == immh)
+    {
+      if (0 == imml || 1 == imml)
+        core->r[rd] = core->r[SP];
+    }
+    else if (2 == immh)
+    {
+      if (0 == imml)
+        core->r[rd] = core->pm;
+    }
   }
 
   else if (0xf3808800 == (opcode & 0xfff0ff00)) // MSR  spec_reg, Ra
   {
     int ra = GET32_RA(opcode);
     uint32_t imm = GET32_IMM8(opcode);
+    uint32_t immh = (imm >> 3) & 0x1f;
+    uint32_t imml = imm & 0x7;
+    uint32_t rav = core->r[ra];
 
     CORE_DBG(core, "msr\t0x%02x, r%d", imm, ra);
-    // TODO: implement
 
-    error("%s: msr not implemented at 0x%08x", core->name, core->r[PC]-2);
+    if (0 == immh)
+    {
+      if (0 == (imm & 4))
+      {
+        core->n = (rav & (1 << BIT_N)) > 0;
+        core->z = (rav & (1 << BIT_Z)) > 0;
+        core->c = (rav & (1 << BIT_C)) > 0;
+        core->v = (rav & (1 << BIT_V)) > 0;
+      }
+    }
+    else if (1 == immh)
+    {
+      if (0 == imml || 1 == imml)
+        core->r[SP] = rav & 0xfffffffc;
+    }
+    else if (2 == immh)
+    {
+      if (0 == imml)
+        core->pm = rav & 1;
+    }
   }
 
   else if (0xf7f0a000 == (opcode & 0xfff0f000)) // UDF.W  #imm16
@@ -1522,7 +1709,8 @@ static instr_t instructions[] =
   { i_uxtb_reg,		0xffc0, 0xb2c0 },
   { i_push,		0xfe00, 0xb400 },
   { i_pop,		0xfe00, 0xbc00 },
-  { i_cps,		0xffef, 0xb662 },
+  { i_cpsie,		0xffff, 0xb662 },
+  { i_cpsid,		0xffff, 0xb672 },
   { i_rev_reg,		0xffc0, 0xba00 },
   { i_rev16_reg,	0xffc0, 0xba40 },
   { i_revsh_reg,	0xffc0, 0xbac0 },
@@ -1624,16 +1812,54 @@ void core_setup(void)
 //-----------------------------------------------------------------------------
 void core_init(core_t *core)
 {
+  uint32_t *ram = (uint32_t *)core->ram;
+
   for (int i = 0; i < 16; i++)
     core->r[i] = 0;
+
+  core->irqs = 0;
+  core->ipsr = 0;
+  core->pm = false;
+  core->sleeping = false;
+
+  core->r[SP] = ram[0];
+  core->r[PC] = ram[1];
+  core->flash = (uint16_t *)core->ram;
+
 }
 
 //-----------------------------------------------------------------------------
 void core_clk(core_t *core)
 {
-  core->opcode = core->flash[core->r[PC] >> 1];
-  core->r[PC] += 2;
+  if (core->irqs && core->pm && 0 == core->ipsr)
+  {
+    core_exception_enter(core);
+  }
+  else
+  {
+    core->opcode = core->flash[core->r[PC] >> 1];
+    core->r[PC] += 2;
+    hash[core->opcode](core);
+  }
+}
 
-  hash[core->opcode](core);
+//-----------------------------------------------------------------------------
+void core_irq_set(core_t *core, int irq)
+{
+  if (core->sleeping)
+  {
+    soc_t *soc = SOC(core);
+    queue_remove(&g_sim.sleeping, (queue_t *)soc);
+    queue_add(&g_sim.active, (queue_t *)soc);
+    core->sleeping = false;
+  }
+
+  core->irqs |= (1 << irq);
+}
+
+//-----------------------------------------------------------------------------
+void core_irq_clear(core_t *core, int irq)
+{
+  core->irqs &= ~(1 << irq);
 }
 

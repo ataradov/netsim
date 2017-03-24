@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+ * Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,6 +21,8 @@
 /*- Includes ----------------------------------------------------------------*/
 #include <stdbool.h>
 #include <stdint.h>
+#include "io_ops.h"
+#include "utils.h"
 #include "events.h"
 
 /*- Types -------------------------------------------------------------------*/
@@ -32,22 +34,23 @@ enum
   TRX_IEEE_ADDR_0_REG   = 0x0c,
   TRX_IEEE_ADDR_1_REG   = 0x10,
   TRX_TX_POWER_REG      = 0x14,
-  TRX_CHANNEL_REG       = 0x18,
-  TRX_SFD_VALUE_REG     = 0x1c,
-  TRX_STATE_REG         = 0x20,
-  TRX_STATUS_REG        = 0x24,
-  TRX_IRQ_MASK_REG      = 0x28,
-  TRX_IRQ_STATUS_REG    = 0x2c,
-  TRX_FRAME_RETRIES_REG = 0x30,
-  TRX_CSMA_RETRIES_REG  = 0x34,
-  TRX_CSMA_MIN_BE_REG   = 0x38,
-  TRX_CSMA_MAX_BE_REG   = 0x3c,
-  TRX_CCA_MODE_REG      = 0x40,
-  TRX_ED_THRESHOLD_REG  = 0x44,
-  TRX_RSSI_LEVEL_REG    = 0x48,
-  TRX_FRAME_LQI_REG     = 0x4c,
-  TRX_FRAME_RSSI_REG    = 0x50,
-  TRX_REG_MASK          = 0xff,
+  TRX_RX_SENSITIVITY    = 0x18,
+  TRX_CHANNEL_REG       = 0x1c,
+  TRX_SFD_VALUE_REG     = 0x20,
+  TRX_STATE_REG         = 0x24,
+  TRX_STATUS_REG        = 0x28,
+  TRX_IRQ_MASK_REG      = 0x2c,
+  TRX_IRQ_STATUS_REG    = 0x30,
+  TRX_FRAME_RETRIES_REG = 0x34,
+  TRX_CSMA_RETRIES_REG  = 0x38,
+  TRX_CSMA_MIN_BE_REG   = 0x3c,
+  TRX_CSMA_MAX_BE_REG   = 0x40,
+  TRX_CCA_MODE_REG      = 0x44,
+  TRX_ED_THRESHOLD_REG  = 0x48,
+  TRX_RSSI_LEVEL_REG    = 0x4c,
+  TRX_FRAME_LQI_REG     = 0x50,
+  TRX_FRAME_RSSI_REG    = 0x54,
+  TRX_FRAME_START_REG   = 0x1000,
 };
 
 enum
@@ -106,8 +109,10 @@ enum
 
 typedef struct trx_t
 {
-  struct trx_t *next;
+  queue_t      queue;
 
+  void         *soc;
+  int          irq;
   char         *name;
   float        x;
   float        y;
@@ -126,6 +131,7 @@ typedef struct trx_t
   float        rx_lqi;
   float        rx_rssi;
   float        rx_carrier;
+  float        rx_dist;
   bool         rx_crc_ok;
 
   struct
@@ -136,24 +142,25 @@ typedef struct trx_t
     uint32_t   ieee_addr_0;    // 0x0c
     uint32_t   ieee_addr_1;    // 0x10
     float      tx_power;       // 0x14
-    uint32_t   channel;        // 0x18
-    uint32_t   sfd;            // 0x1c
-    uint32_t   state;          // 0x20
-    uint32_t   status;         // 0x24
-    uint32_t   irq_mask;       // 0x28
-    uint32_t   irq_status;     // 0x2c
-    uint32_t   frame_retries;  // 0x30
-    uint32_t   csma_retries;   // 0x34
-    uint32_t   csma_min_be;    // 0x38
-    uint32_t   csma_max_be;    // 0x3c
-    uint32_t   cca_mode;       // 0x40
-    float      ed_threshold;   // 0x44
-    float      rssi_level;     // 0x48
-    uint32_t   frame_lqi;      // 0x4c
-    float      frame_rssi;     // 0x50
+    float      rx_sensitivity; // 0x18
+    uint32_t   channel;        // 0x1c
+    uint32_t   sfd;            // 0x20
+    uint32_t   state;          // 0x24
+    uint32_t   status;         // 0x28
+    uint32_t   irq_mask;       // 0x2c
+    uint32_t   irq_status;     // 0x30
+    uint32_t   frame_retries;  // 0x34
+    uint32_t   csma_retries;   // 0x38
+    uint32_t   csma_min_be;    // 0x3c
+    uint32_t   csma_max_be;    // 0x40
+    uint32_t   cca_mode;       // 0x44
+    float      ed_threshold;   // 0x48
+    float      rssi_level;     // 0x4c
+    uint32_t   frame_lqi;      // 0x50
+    float      frame_rssi;     // 0x54
   } reg;
 
-  uint8_t      buf[128];
+  uint8_t      buf[128];       // 0x1000
 } trx_t;
 
 /*- Prototypes --------------------------------------------------------------*/
@@ -162,10 +169,8 @@ void trx_set_state(trx_t *trx, uint8_t state);
 void trx_rx_start(trx_t *trx);
 void trx_rx_end(trx_t *trx, bool normal);
 
-uint8_t trx_read_b(trx_t *trx, uint32_t addr);
-uint32_t trx_read_w(trx_t *trx, uint32_t addr);
-void trx_write_b(trx_t *trx, uint32_t addr, uint8_t data);
-void trx_write_w(trx_t *trx, uint32_t addr, uint32_t data);
+/*- Variables ---------------------------------------------------------------*/
+extern io_ops_t trx_ops;
 
 #endif // _TRX_H_
 

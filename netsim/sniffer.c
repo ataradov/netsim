@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+ * Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@
 #include "sniffer.h"
 
 /*- Prototypes --------------------------------------------------------------*/
-static void sniffer_write(sniffer_t *sniffer, char *str, int size);
+static void sniffer_write(sniffer_t *sniffer, const char *str, int size);
 
 /*- Variables ---------------------------------------------------------------*/
 static char hex[] = "0123456789abcdef";
@@ -77,7 +77,7 @@ void sniffer_write_frame(sniffer_t *sniffer, uint8_t *data, float power)
 }
 
 //-----------------------------------------------------------------------------
-static void sniffer_write(sniffer_t *sniffer, char *str, int size)
+static void sniffer_write(sniffer_t *sniffer, const char *str, int size)
 {
   int n;
 

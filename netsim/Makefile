@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2014, Alex Taradov <taradov@gmail.com>
+# Copyright (c) 2014-2017, Alex Taradov <alex@taradov.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,19 +16,17 @@
 #
 ###############################################################################
 
-USE_LIBCORE = 0
-
 SRCS = \
   main.c \
   config.c \
   soc.c \
+  core.c \
   utils.c \
   events.c \
   medium.c \
   noise.c \
   sniffer.c \
   trx.c \
-  mem.c \
   sys_ctrl.c \
   sys_timer.c
 
@@ -36,32 +34,28 @@ HEADERS = \
   main.h \
   config.h \
   soc.h \
+  core.h \
   utils.h \
   events.h \
   medium.h \
   noise.h \
   sniffer.h \
   trx.h \
-  mem.h \
+  io_ops.h \
   sys_ctrl.h \
   sys_timer.h
 
 LIBS = -lm
 
-ifeq ($(USE_LIBCORE), 1)
-  DEFINES += -DUSE_LIBCORE
-  HEADERS += libcore/core.h
-  LIBS += -Llibcore -lcore
-else
-  SRCS += core.c
-  HEADERS += core.h
-endif
+CFLAGS += -W -Wall -std=gnu11 -O3
+CFLAGS += -fgnu89-inline
+CFLAGS += -D__STDC_FORMAT_MACROS=1
 
 all: netsim
 
 netsim: $(SRCS) $(HEADERS)
-	gcc -W -Wall -std=gnu99 -O3 $(DEFINES) $(SRCS) $(LIBS) -o netsim
+	gcc $(CFLAGS) $(DEFINES) $(SRCS) $(LIBS) -o netsim
 
 clean:
-	rm -f netsim netsim.exe
+	-rm -f netsim netsim.exe
 
