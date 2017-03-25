@@ -28,8 +28,8 @@
 #ifdef PHY_SIMULATOR
 
 /*- Includes ----------------------------------------------------------------*/
-#include "sysTypes.h"
-#include "hal.h"
+#include <stdint.h>
+#include <stdbool.h>
 #include "phy.h"
 #include "simulator.h"
 
