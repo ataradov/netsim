@@ -94,7 +94,9 @@ static void sim_init(void)
   g_sim.time = 1000000;
   g_sim.scale = 1.0f;
 
-  g_sim.uid = 0;
+  g_sim.node_uid = 0;
+  g_sim.noise_uid = 0;
+  g_sim.sniffer_uid = 0;
 
   queue_init(&g_sim.active);
   queue_init(&g_sim.sleeping);

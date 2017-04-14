@@ -47,6 +47,8 @@ void sniffer_init(sniffer_t *sniffer)
   sniffer_write(sniffer, "#Format=4\r\n", -1);
   sniffer_write(sniffer, "# SNA v5.5.5.5 SUS:20140418 ACT:000000\r\n", -1);
 
+  sniffer->loss_trx = NULL;
+
   sniffer->seq = 1;
 }
 

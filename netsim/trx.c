@@ -144,9 +144,12 @@ void trx_init(trx_t *trx)
   trx->reg.cca_mode        = 0; // ???
   trx->reg.ed_threshold    = -86.0f;
 
-  trx->tx        = false;
-  trx->rx        = false;
-  trx->rx_lqi    = 1.0f;
+  trx->tx     = false;
+  trx->rx     = false;
+  trx->rx_lqi = 1.0f;
+
+  trx->loss_trx   = NULL;
+  trx->loss_noise = NULL;
 
   TRX_DBG(trx, "started (%.2f, %.2f)", trx->x, trx->y);
 }

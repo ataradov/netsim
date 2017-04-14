@@ -85,6 +85,8 @@ void *sim_malloc(int size)
   if (NULL == ptr)
     error("out of memory");
 
+  memset(ptr, 0, size);
+
   return ptr;
 }
 

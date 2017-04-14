@@ -29,12 +29,15 @@ typedef struct sniffer_t
   queue_t      queue;
 
   char         *name;
+  int          uid;
   float        x;
   float        y;
   float        freq_a;
   float        freq_b;
   float        sensitivity;
   char         *path;
+
+  float        *loss_trx;
 
   int          fd;
   int          seq;

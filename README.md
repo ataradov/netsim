@@ -189,7 +189,7 @@ Example:
 
 ### Noise Source
 
-This command defines a noise source located at the coordinates (`x`, `y`). 
+This command defines a noise source located at the coordinates (`x`, `y`).
 
 The noise source is capable of generating an uncorrelated white noise on
 a single channel or a range of channels. The `frequency` parameter must
@@ -217,5 +217,30 @@ Format:
 Example:
 
     noise	N_1	100.0	100.0	2405-2480	-10.0	2000000	1000000
+
+### Additional Path Loss
+
+This command defines additional path loss between two nodes, a node and
+a noise source, or a sniffer and a node.
+
+This command can be used to simulate obstacles (like walls and buildings),
+or non-uniform environments. It can also be used to artificially force certain
+routing configurations. Introduced path loss is symmetrical in both directions
+for configurations where both sides are nodes.
+
+Additional path loss is defined by the `loss` parameter. The negative values
+represent additional signal amplification.
+
+Format:
+
+    loss	<receiver> <transmitter> <loss>
+
+ * receiver -- name of the receiver device (can be a node or a sniffer)
+ * transmitter -- name of the transmitter device (can be a node or a noise source)
+ * loss -- additional path loss between the devices (dBm)
+
+Example:
+
+    noise	R_0	R_1	10.0
 
 

@@ -64,7 +64,7 @@ static inline float lqi_limit(float lqi)
 //-----------------------------------------------------------------------------
 void medium_update_trx(trx_t *rx_trx)
 {
-  float noise, power, lambda, dist, loss, freq;
+  float noise, power, lambda, dist, loss, add_loss, freq;
   float lqi_carrier, lqi_noise, lqi_power;
   float carriers[3], dists[3];
   trx_t *trxs[3];
@@ -87,7 +87,8 @@ void medium_update_trx(trx_t *rx_trx)
 
     dist = distance(rx_trx->x, rx_trx->y, tx_trx->x, tx_trx->y);
     loss = 20.0*log10f(4.0*M_PI * dist / lambda);
-    power = tx_trx->reg.tx_power - loss - ADD_PATH_LOSS;
+    add_loss = rx_trx->loss_trx ? rx_trx->loss_trx[tx_trx->uid] : 0.0;
+    power = tx_trx->reg.tx_power - loss - add_loss - ADD_PATH_LOSS;
 
     // Simulates random power loss due to fading and multipath propagation (-10 - 0 dB)
     power += -10.0 * randf_next();
@@ -137,7 +138,8 @@ void medium_update_trx(trx_t *rx_trx)
 
     dist = distance(rx_trx->x, rx_trx->y, tx_noise->x, tx_noise->y);
     loss = 20.0*log10f(4.0*M_PI * dist / lambda);
-    power = tx_noise->power - loss;
+    add_loss = rx_trx->loss_noise ? rx_trx->loss_noise[tx_noise->uid] : 0.0;
+    power = tx_noise->power - loss - add_loss;
     noise = padd(noise, power);
   }
 
@@ -198,7 +200,7 @@ void medium_tx_end(trx_t *trx, bool normal)
 
   if (normal)
   {
-    float power, lambda, dist, loss, freq;
+    float power, lambda, dist, loss, add_loss, freq;
 
     freq = trx->reg.channel * MHz;
     lambda = C / freq;
@@ -210,7 +212,8 @@ void medium_tx_end(trx_t *trx, bool normal)
 
       dist = distance(sniffer->x, sniffer->y, trx->x, trx->y);
       loss = 20.0*log10f(4.0*M_PI * dist / lambda);
-      power = trx->reg.tx_power - loss;
+      add_loss = sniffer->loss_trx ? sniffer->loss_trx[trx->uid] : 0.0;
+      power = trx->reg.tx_power - loss - add_loss;
 
       if (power < sniffer->sensitivity)
         continue;

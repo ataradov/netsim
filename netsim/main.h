@@ -30,7 +30,9 @@ typedef struct
   uint32_t     seed;
   uint32_t     time;
   float        scale;
-  uint32_t     uid;
+  int          node_uid;
+  int          noise_uid;
+  int          sniffer_uid;
   uint64_t     cycle;
 
   queue_t      active;

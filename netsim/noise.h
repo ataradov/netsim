@@ -29,6 +29,7 @@ typedef struct noise_t
   queue_t      queue;
 
   char         *name;
+  int          uid;
   float        x;
   float        y;
   float        freq_a;

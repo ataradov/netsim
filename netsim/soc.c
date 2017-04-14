@@ -68,14 +68,13 @@ void soc_init(soc_t *soc)
   soc->peripherals[SOC_ID_SYS_TIMER] = &soc->sys_timer;
   soc->peripherals[SOC_ID_TRX]       = &soc->trx;
 
-  soc->uid = g_sim.uid++;
-
   soc->core.soc = soc;
   soc->core.name = soc->name;
   core_init(&soc->core);
 
   soc->trx.soc = soc;
   soc->trx.name = soc->name;
+  soc->trx.uid = soc->uid;
   soc->trx.x = soc->x;
   soc->trx.y = soc->y;
   soc->trx.irq = SOC_IRQ_TRX;

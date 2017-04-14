@@ -185,6 +185,53 @@ static void get_range(char **line, long *a, long *b)
 }
 
 //-----------------------------------------------------------------------------
+static char *get_name(char **line)
+{
+  char *name = get_str(line);
+
+  if (!isalpha(name[0]) && '_' != name[0])
+    error("%s:%d: name must start with alphabetic character or '_', got '%s'", config_name, config_line, name);
+
+  return name;
+}
+
+//-----------------------------------------------------------------------------
+static trx_t *find_node(char *name)
+{
+  queue_foreach(trx_t, trx, &g_sim.trxs)
+  {
+    if (0 == strcmp(trx->name, name))
+      return trx;
+  }
+
+  return NULL;
+}
+
+//-----------------------------------------------------------------------------
+static noise_t *find_noise(char *name)
+{
+  queue_foreach(noise_t, noise, &g_sim.noises)
+  {
+    if (0 == strcmp(noise->name, name))
+      return noise;
+  }
+
+  return NULL;
+}
+
+//-----------------------------------------------------------------------------
+static sniffer_t *find_sniffer(char *name)
+{
+  queue_foreach(sniffer_t, sniffer, &g_sim.sniffers)
+  {
+    if (0 == strcmp(sniffer->name, name))
+      return sniffer;
+  }
+
+  return NULL;
+}
+
+//-----------------------------------------------------------------------------
 static void load_file(char *name, uint8_t *data, int size)
 {
   int f, n;
@@ -228,11 +275,15 @@ static void process_line(char *line)
   {
     soc_t *soc = (soc_t *)sim_malloc(sizeof(soc_t));
 
-    soc->name = get_str(&line);
+    soc->name = get_name(&line);
+    soc->uid = g_sim.node_uid++;
     soc->x = get_float(&line) * g_sim.scale;
     soc->y = get_float(&line) * g_sim.scale;
     soc->id = get_long(&line);
     soc->path = get_str(&line);
+
+    if (find_node(soc->name))
+      error("%s:%d: node '%s' already exists", config_name, config_line, soc->name);
 
     load_file(soc->path, soc->core.ram, sizeof(soc->core.ram));
 
@@ -245,7 +296,8 @@ static void process_line(char *line)
     sniffer_t *sniffer = (sniffer_t *)sim_malloc(sizeof(sniffer_t));
     long freq_a, freq_b;
 
-    sniffer->name = get_str(&line);
+    sniffer->name = get_name(&line);
+    sniffer->uid = g_sim.sniffer_uid++;
     sniffer->x = get_float(&line) * g_sim.scale;
     sniffer->y = get_float(&line) * g_sim.scale;
     get_range(&line, &freq_a, &freq_b);
@@ -253,6 +305,9 @@ static void process_line(char *line)
     sniffer->freq_b = freq_b * MHz;
     sniffer->sensitivity = get_float(&line);
     sniffer->path = get_str(&line);
+
+    if (find_sniffer(sniffer->name))
+      error("%s:%d: sniffer '%s' already exists", config_name, config_line, sniffer->name);
 
     sniffer_init(sniffer);
     queue_add(&g_sim.sniffers, (queue_t *)sniffer);
@@ -263,7 +318,8 @@ static void process_line(char *line)
     noise_t *noise = (noise_t *)sim_malloc(sizeof(noise_t));
     long freq_a, freq_b;
 
-    noise->name = get_str(&line);
+    noise->name = get_name(&line);
+    noise->uid = g_sim.noise_uid++;
     noise->x = get_float(&line) * g_sim.scale;
     noise->y = get_float(&line) * g_sim.scale;
     get_range(&line, &freq_a, &freq_b);
@@ -273,8 +329,56 @@ static void process_line(char *line)
     noise->on = get_long(&line);
     noise->off = get_long(&line);
 
+    if (find_noise(noise->name))
+      error("%s:%d: noise '%s' already exists", config_name, config_line, noise->name);
+
     noise_init(noise);
     queue_add(&g_sim.noises, (queue_t *)noise);
+  }
+
+  else if (check_str(&line, "loss"))
+  {
+    char *node_name = get_name(&line);
+    char *other_name = get_name(&line);
+    float loss = get_float(&line);
+
+    trx_t *node = find_node(node_name);
+    sniffer_t *sniffer = find_sniffer(node_name);
+    trx_t *other_node = find_node(other_name);
+    noise_t *other_noise = find_noise(other_name);
+
+    if (node)
+    {
+      if (other_node)
+      {
+        if (NULL == node->loss_trx)
+          node->loss_trx = (float *)sim_malloc(sizeof(float) * g_sim.node_uid);
+
+        if (NULL == other_node->loss_trx)
+          other_node->loss_trx = (float *)sim_malloc(sizeof(float) * g_sim.node_uid);
+
+        node->loss_trx[other_node->uid] = loss;
+        other_node->loss_trx[node->uid] = loss;
+      }
+      else if (other_noise)
+      {
+        if (NULL == node->loss_noise)
+          node->loss_noise = (float *)sim_malloc(sizeof(float) * g_sim.noise_uid);
+
+        node->loss_noise[other_noise->uid] = loss;
+      }
+      else
+        error("%s:%d: '%s' does not name a node or a noise", config_name, config_line, other_name);
+    }
+    else if (sniffer)
+    {
+      if (NULL == sniffer->loss_trx)
+        sniffer->loss_trx = (float *)sim_malloc(sizeof(float) * g_sim.node_uid);
+
+      sniffer->loss_trx[other_node->uid] = loss;
+    }
+    else
+      error("%s:%d: '%s' does not name a node or a sniffer", config_name, config_line, node_name);
   }
 
   else

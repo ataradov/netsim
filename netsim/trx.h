@@ -112,10 +112,14 @@ typedef struct trx_t
   queue_t      queue;
 
   void         *soc;
-  int          irq;
   char         *name;
+  int          uid;
+  int          irq;
   float        x;
   float        y;
+
+  float        *loss_trx;
+  float        *loss_noise;
 
   bool         tx;
   event_t      tx_event;
