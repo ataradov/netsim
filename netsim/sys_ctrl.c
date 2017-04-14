@@ -34,6 +34,8 @@ void sys_ctrl_init(sys_ctrl_t *sys_ctrl)
 //-----------------------------------------------------------------------------
 static uint32_t sys_ctrl_read_w(sys_ctrl_t *sys_ctrl, uint32_t addr)
 {
+  soc_t *soc = SOC(sys_ctrl);
+
   switch (addr)
   {
     case SYS_CTRL_UID:
@@ -44,6 +46,10 @@ static uint32_t sys_ctrl_read_w(sys_ctrl_t *sys_ctrl, uint32_t addr)
 
     case SYS_CTRL_RAND:
       return rand_next();
+
+    case SYS_CTRL_INTENSET:
+    case SYS_CTRL_INTENCLR:
+      return soc->core.irq_en;
   }
 
   return 0;
@@ -63,6 +69,16 @@ static void sys_ctrl_write_w(sys_ctrl_t *sys_ctrl, uint32_t addr, uint32_t data)
         char *str = (char *)&soc->core.ram[data];
         LOG_DBG(soc, "%s", str);
       }
+    } break;
+
+    case SYS_CTRL_INTENSET:
+    {
+      soc->core.irq_en |= data;
+    } break;
+
+    case SYS_CTRL_INTENCLR:
+    {
+      soc->core.irq_en &= ~data;
     } break;
   }
 }

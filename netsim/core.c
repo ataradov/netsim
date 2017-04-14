@@ -1818,6 +1818,7 @@ void core_init(core_t *core)
     core->r[i] = 0;
 
   core->irqs = 0;
+  core->irq_en = 0;
   core->ipsr = 0;
   core->pm = false;
   core->sleeping = false;
@@ -1831,7 +1832,7 @@ void core_init(core_t *core)
 //-----------------------------------------------------------------------------
 void core_clk(core_t *core)
 {
-  if (core->irqs && core->pm && 0 == core->ipsr)
+  if ((core->irqs & core->irq_en) && core->pm && 0 == core->ipsr)
   {
     core_exception_enter(core);
   }

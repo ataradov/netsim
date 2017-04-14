@@ -29,6 +29,8 @@ enum
   SYS_CTRL_ID          = 0x04,
   SYS_CTRL_RAND        = 0x08,
   SYS_CTRL_LOG         = 0x0c,
+  SYS_CTRL_INTENSET    = 0x10,
+  SYS_CTRL_INTENCLR    = 0x14,
 };
 
 typedef struct

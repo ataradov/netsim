@@ -38,6 +38,8 @@
 #define SYS_CTRL_ID            MMIO_REG(0x01000004, uint32_t)
 #define SYS_CTRL_RAND          MMIO_REG(0x01000008, uint32_t)
 #define SYS_CTRL_LOG           MMIO_REG(0x0100000c, char *)
+#define SYS_CTRL_INTENSET      MMIO_REG(0x01000010, uint32_t)
+#define SYS_CTRL_INTENCLR      MMIO_REG(0x01000014, uint32_t)
 
 #define SYS_TIMER_CONTROL      MMIO_REG(0x02000000, uint32_t)
 #define SYS_TIMER_PERIOD       MMIO_REG(0x02000004, uint32_t)
@@ -46,8 +48,6 @@
 #define SYS_TIMER_INTENSET     MMIO_REG(0x02000010, uint32_t)
 #define SYS_TIMER_INTMASK      MMIO_REG(0x02000014, uint32_t)
 #define SYS_TIMER_INTFLAG      MMIO_REG(0x02000018, uint32_t)
-
-#define SYS_TIMER_INTFLAG_COUNT    (1 << 0)
 
 #define TRX_CONFIG             MMIO_REG(0x40000000, uint32_t)
 #define TRX_PAN_ID             MMIO_REG(0x40000004, uint32_t)
@@ -76,6 +76,17 @@
 #define BREAK                  MMIO_REG(0xff000000, uint32_t)
 
 /*- Types -------------------------------------------------------------------*/
+enum
+{
+  SOC_IRQ_TRX       = 1 << 0,
+  SOC_IRQ_SYS_TIMER = 1 << 1,
+};
+
+enum
+{
+  SYS_TIMER_INTFLAG_COUNT = 1 << 0,
+};
+
 enum
 {
   TRX_CONFIG_TX_AUTO_CRC       = 1 << 0,

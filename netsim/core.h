@@ -37,6 +37,7 @@ typedef struct
   bool         v;
 
   uint32_t     irqs;
+  uint32_t     irq_en;
   uint32_t     ipsr;
   bool         pm;
   bool         sleeping;
