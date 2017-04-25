@@ -28,7 +28,7 @@
 typedef struct
 {
   uint32_t     seed;
-  uint32_t     time;
+  uint64_t     time;
   float        scale;
   int          node_uid;
   int          noise_uid;
