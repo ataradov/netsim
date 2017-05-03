@@ -41,7 +41,10 @@ DUMMY void irq_handler_pend_sv(void);
 DUMMY void irq_handler_sys_tick(void);
 
 DUMMY void irq_handler_trx(void);
-DUMMY void irq_handler_timer(void);
+DUMMY void irq_handler_timer0(void);
+DUMMY void irq_handler_timer1(void);
+DUMMY void irq_handler_timer2(void);
+DUMMY void irq_handler_timer3(void);
 
 extern int main(void);
 
@@ -78,7 +81,10 @@ void (* const vectors[])(void) =
 
   // Peripheral handlers
   irq_handler_trx,               // 0 - TRX
-  irq_handler_timer,             // 1 - Timer
+  irq_handler_timer0,            // 1 - Timer 0
+  irq_handler_timer1,            // 2 - Timer 1
+  irq_handler_timer2,            // 3 - Timer 2
+  irq_handler_timer3,            // 4 - Timer 3
 };
 
 /*- Implementations ---------------------------------------------------------*/
