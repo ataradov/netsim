@@ -24,6 +24,7 @@
 
 /*- Definitions -------------------------------------------------------------*/
 #define CORE_RAM_SIZE    128*1024 // Must be a power of 2
+#define CORE_FLASH_SIZE  (CORE_RAM_SIZE / 2)
 
 /*- Types -------------------------------------------------------------------*/
 typedef struct

@@ -798,7 +798,7 @@ static inline bool trx_config(trx_t *trx, uint32_t bit)
 //-----------------------------------------------------------------------------
 static inline void trx_interrupt(trx_t *trx, uint32_t status)
 {
-  trx->reg.irq_status |= status & trx->reg.irq_mask;
+  trx->reg.irq_status |= status;
 
   if (trx->reg.irq_status & trx->reg.irq_mask)
     soc_irq_set(SOC(trx), trx->irq);

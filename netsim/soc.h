@@ -46,7 +46,7 @@ typedef struct soc_t
   long         uid;
   core_t       core;
   sys_ctrl_t   sys_ctrl;
-  sys_timer_t  sys_timer;
+  sys_timer_t  sys_timer[4];
   trx_t        trx;
 
   void         *peripherals[SOC_PERIPHERALS_SIZE];
@@ -55,14 +55,20 @@ typedef struct soc_t
 enum
 {
   SOC_ID_SYS_CTRL      = 0x01,
-  SOC_ID_SYS_TIMER     = 0x02,
+  SOC_ID_SYS_TIMER_0   = 0x02,
+  SOC_ID_SYS_TIMER_1   = 0x03,
+  SOC_ID_SYS_TIMER_2   = 0x04,
+  SOC_ID_SYS_TIMER_3   = 0x05,
   SOC_ID_TRX           = 0x40,
 };
 
 enum
 {
   SOC_IRQ_TRX          = 0,
-  SOC_IRQ_SYS_TIMER    = 1,
+  SOC_IRQ_SYS_TIMER_0  = 1,
+  SOC_IRQ_SYS_TIMER_1  = 2,
+  SOC_IRQ_SYS_TIMER_2  = 3,
+  SOC_IRQ_SYS_TIMER_3  = 4,
 };
 
 /*- Prototypes --------------------------------------------------------------*/

@@ -26,8 +26,11 @@
 #include "utils.h"
 
 /*- Definitions -------------------------------------------------------------*/
+#define DETECT_FLASH_WRITES
+
 #define HASH_TABLE_SIZE        0x10000  // 64k
 #define ARRAY_SIZE(a)          (sizeof(a) / sizeof(a[0]))
+#define GET_PC(core)           (((core)->r[15] & ~1) - 2)
 
 #define SP     13
 #define LR     14
@@ -137,6 +140,14 @@ static inline uint32_t read_w(core_t *core, uint32_t addr)
 //-----------------------------------------------------------------------------
 static inline void write_b(core_t *core, uint32_t addr, uint8_t data)
 {
+#ifdef DETECT_FLASH_WRITES
+  if (addr < CORE_FLASH_SIZE)
+  {
+    error("%s: 0x%08x: byte write into the flash area @ 0x%08x = 0x%02x",
+        core->name, GET_PC(core), addr, data);
+  }
+#endif
+
   if (addr < CORE_RAM_SIZE)
     ((uint8_t *)core->ram)[addr] = data;
   else
@@ -146,6 +157,14 @@ static inline void write_b(core_t *core, uint32_t addr, uint8_t data)
 //-----------------------------------------------------------------------------
 static inline void write_h(core_t *core, uint32_t addr, uint16_t data)
 {
+#ifdef DETECT_FLASH_WRITES
+  if (addr < CORE_FLASH_SIZE)
+  {
+    error("%s: 0x%08x: half write into the flash area @ 0x%08x = 0x%04x",
+        core->name, GET_PC(core), addr, data);
+  }
+#endif
+
   if (addr < CORE_RAM_SIZE)
     ((uint16_t *)core->ram)[addr >> 1] = data;
   else
@@ -155,6 +174,14 @@ static inline void write_h(core_t *core, uint32_t addr, uint16_t data)
 //-----------------------------------------------------------------------------
 static inline void write_w(core_t *core, uint32_t addr, uint32_t data)
 {
+#ifdef DETECT_FLASH_WRITES
+  if (addr < CORE_FLASH_SIZE)
+  {
+    error("%s: 0x%08x: word write into the flash area @ 0x%08x = 0x%08x",
+        core->name, GET_PC(core), addr, data);
+  }
+#endif
+
   if (addr < CORE_RAM_SIZE)
     ((uint32_t *)core->ram)[addr >> 2] = data;
   else
@@ -1820,7 +1847,7 @@ void core_init(core_t *core)
   core->irqs = 0;
   core->irq_en = 0;
   core->ipsr = 0;
-  core->pm = false;
+  core->pm = true;
   core->sleeping = false;
 
   core->r[SP] = ram[0];
